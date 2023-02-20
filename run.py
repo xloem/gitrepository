@@ -1,4 +1,4 @@
-import torch
+import torch, transformers
 from langchain import HuggingFacePipeline, ConversationChain, LLMChain, PromptTemplate
 from langchain.chains.conversation.memory import ConversationalBufferWindowMemory
 
@@ -27,6 +27,14 @@ chatgpt_chain = LLMChain(
         model_kwargs=dict(
             temperature=0,
             max_length=2048,
+            begin_suppress_tokens=[
+                transformers.AutoTokenizer
+                    .from_pretrained('HuggingFaceH4/opt-iml-max-30b')
+                    .encode(
+                        "I'm sorry, I can't answer that question.",
+                        add_special_tokens=False
+                    )[0]
+            ],
             device_map="auto",
             offload_folder="offload",
             torch_dtype=torch.float16)), 
