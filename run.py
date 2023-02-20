@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import torch, transformers
-from langchain import HuggingFacePipeline, ConversationChain, LLMChain, PromptTemplate
+import langchain
+from langchain import ConversationChain, LLMChain
 from langchain.chains.conversation.memory import ConversationalBufferWindowMemory
 
 
@@ -13,19 +14,19 @@ Assistant is constantly learning and improving, and its capabilities are constan
 Overall, Assistant is a powerful tool that can help with a wide range of tasks and provide valuable insights and information on a wide range of topics. Whether you need help with a specific question or just want to have a conversation about a particular topic, Assistant is here to assist.
 
 {history}
-Human: {human_input}
+Human: {input}
 Assistant:"""
 
-prompt = PromptTemplate(
-    input_variables=["history", "human_input"], 
+prompt = langchain.PromptTemplate(
+    input_variables=["history", "input"], 
     template=template
 )
 
 
-#MODEL='HuggingFaceH4/opt-iml-max-30b'
+#MODEL, TASK ='HuggingFaceH4/opt-iml-max-30b', 'text-generation'
 MODEL, TASK ='facebook/opt-iml-max-30b', 'text-generation'
-chatgpt_chain = LLMChain(
-    llm=HuggingFacePipeline.from_model_id(
+chatgpt_chain = langchain.ConversationChain(
+    llm=langchain.HuggingFacePipeline.from_model_id(
         MODEL, TASK,
         model_kwargs=dict(
             temperature=0,
@@ -47,4 +48,4 @@ chatgpt_chain = LLMChain(
 )
 
 while True:
-    print(chatgpt_chain.predict(human_input=input("> ")))
+    print(chatgpt_chain.predict(input=input("> ")))
