@@ -21,20 +21,22 @@ prompt = PromptTemplate(
 )
 
 
+#MODEL='HuggingFaceH4/opt-iml-max-30b'
+MODEL, TASK ='facebook/opt-iml-max-30b', 'text-generation'
 chatgpt_chain = LLMChain(
     llm=HuggingFacePipeline.from_model_id(
-        "HuggingFaceH4/opt-iml-max-30b", "text-generation",
+        MODEL, TASK,
         model_kwargs=dict(
             temperature=0,
             max_length=2048,
-            begin_suppress_tokens=[
-                transformers.AutoTokenizer
-                    .from_pretrained('HuggingFaceH4/opt-iml-max-30b')
-                    .encode(
-                        "I'm sorry, I can't answer that question.",
-                        add_special_tokens=False
-                    )[0]
-            ],
+#            begin_suppress_tokens=[
+#                transformers.AutoTokenizer
+#                    .from_pretrained(MODEL)
+#                    .encode(
+#                        "I'm sorry, I can't answer that question.",
+#                        add_special_tokens=False
+#                    )[0]
+#            ],
             device_map="auto",
             offload_folder="offload",
             torch_dtype=torch.float16)), 
