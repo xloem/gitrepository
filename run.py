@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import torch, transformers
 from langchain import HuggingFacePipeline, ConversationChain, LLMChain, PromptTemplate
 from langchain.chains.conversation.memory import ConversationalBufferWindowMemory
