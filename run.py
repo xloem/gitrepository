@@ -1,4 +1,5 @@
-from langchain import OpenAI, ConversationChain, LLMChain, PromptTemplate
+import torch
+from langchain import HuggingFacePipeline, ConversationChain, LLMChain, PromptTemplate
 from langchain.chains.conversation.memory import ConversationalBufferWindowMemory
 
 
@@ -21,11 +22,18 @@ prompt = PromptTemplate(
 
 
 chatgpt_chain = LLMChain(
-    llm=OpenAI(temperature=0), 
+    llm=HuggingFacePipeline.from_model_id(
+        "HuggingFaceH4/opt-iml-max-30b", "text-generation",
+        model_kwargs=dict(
+            temperature=0,
+            max_length=2048,
+            device_map="auto",
+            offload_folder="offload",
+            torch_dtype=torch.float16)), 
     prompt=prompt, 
     verbose=True, 
     memory=ConversationalBufferWindowMemory(k=2),
 )
 
 while True:
-    print(chatgpt_chain.predict(input("> ")))
+    print(chatgpt_chain.predict(human_input=input("> ")))
