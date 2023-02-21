@@ -1,12 +1,17 @@
 import dataclasses
-import os
+import os, shutil
+from tqdm import tqdm
+import numpy as np
 
 import transformers
 import flexgen.flex_opt as flexgen
 from flexgen.opt_config import disable_torch_init, restore_torch_init
 import langchain.llms as llms
 
-# i copied from upstream and added the kwparams for ram-limited systems to maybe use accelerate
+# i copied from upstream and added:
+# - kwparams for ram-limited systems to use accelerate
+# - short circuiting if the path exists (redundant upstream)
+# - code to free space if tight
 def download_opt_weights(model_name, path, **kwparams):
     """Download weights from huggingface."""
     import torch
@@ -16,6 +21,8 @@ def download_opt_weights(model_name, path, **kwparams):
         model_name = model_name.split("/")[1].lower()
     path = os.path.join(path, f"{model_name}-np")
     path = os.path.abspath(os.path.expanduser(path))
+    if os.path.exists(path):
+        return
 
     if "opt" in model_name:
         hf_model_name = "facebook/" + model_name
@@ -31,13 +38,22 @@ def download_opt_weights(model_name, path, **kwparams):
           f"If it seems to get stuck, you can monitor the progress by "
           f"checking the memory usage of this process.")
 
-#    disable_torch_init()
+    disable_torch_init()
     model = model_class.from_pretrained(hf_model_name, torch_dtype=torch.float16,
-#                                        _fast_init=True,
-                                        **kwparams)
-#    restore_torch_init()
+                                        _fast_init=True,
+                                        **kwparams
+    )
+    restore_torch_init()
 
     os.makedirs(path, exist_ok=True)
+
+    # added: free disk space if needed
+    needed_space = sum([np.prod(np.array(p.shape)) for p in model.parameters()]) * 2
+    statvfs = os.statvfs(path)
+    available_space = statvfs.f_frsize * statvfs.f_bavail
+    if available_space < needed_space:
+        print('Wiping transformers cache to free space.')
+        shutil.rmtree(transformers.utils.TRANSFORMERS_CACHE)
 
     print(f"Convert the weights to numpy format under {path} ...")
     if "opt" in model_name:
@@ -76,6 +92,8 @@ class FlexGenLLM:
         self.path = path
         self.model_kwargs = {**model_kwargs, **flat_kwargs}
     def __enter__(self):
+        owner, shortname = self.name.split('/')
+        download_opt_weights(self.name, self.path, **self.model_kwargs)
         if self.tokenizer is None:
             self.tokenizer = self.name
         if isinstance(self.tokenizer, str):
@@ -105,13 +123,12 @@ class FlexGenLLM:
                         num_bits=4, group_size=64,
                         group_dim=2, symmetric=False))
         if self.opt_config is None:
-            self.opt_config = self.name
+            self.opt_config = shortname
         if isinstance(self.opt_config, str):
             self.opt_config = flexgen.get_opt_config(self.opt_config)
-        if self.opt_config.name != self.name:
-            self.opt_config = dataclasses.replace(self.opt_config, name = self.name)
+        if self.opt_config.name != shortname:
+            self.opt_config = dataclasses.replace(self.opt_config, name = shortname)
         self.model = flexgen.OptLM(self.opt_config, self.env, self.path, self.offload_policy)
-        download_opt_weights(self.name, self.path, **self.model_kwargs)
         self.model.init_all_weights()
         self.pipeline = transformers.pipeline(
             task = self.task,
