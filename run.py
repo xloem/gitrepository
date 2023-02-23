@@ -4,8 +4,13 @@ import torch, transformers
 import langchain
 from langchain import ConversationChain, LLMChain
 
+langchain.llm_cache = langchain.cache.SQLiteCache(database_path="langchain.db")
+
 #MODEL, TASK ='HuggingFaceH4/opt-iml-max-30b', 'text-generation'
 MODEL, TASK ='facebook/opt-iml-max-30b', 'text-generation'
+#MODEL, TASK ='facebook/opt-iml-max-1.3b', 'text-generation'
+#MODEL, TASK ='google/flan-t5-xxl', 'text2text-generation'
+#MODEL, TASK ='google/flan-t5-xl', 'text2text-generation'
 
 # maybe:
 # - look at how memory is hooked in and parameterize it
@@ -35,14 +40,20 @@ MODEL, TASK ='facebook/opt-iml-max-30b', 'text-generation'
 #)
 
 
-#chatgpt_begin_suppress_tokens=[
-#            transformers.AutoTokenizer
-#                .from_pretrained(MODEL)
-#                .encode(
-#                    "I'm sorry, I can't answer that question.",
-#                    add_special_tokens=False
-#                )[0]
-#        ],
+begin_suppress_tokens=[
+    transformers.AutoTokenizer
+        .from_pretrained(MODEL)
+        .encode(
+            "I'm sorry, I can't answer that question.",
+            add_special_tokens=False
+        )[0],
+    transformers.AutoTokenizer
+        .from_pretrained(MODEL)
+        .encode(
+            "[your response here]",
+            add_special_tokens=False
+        )[0],
+]
 
 class Agent:
     def __init__(self, MODEL, TASK, **kwparams):
@@ -55,10 +66,12 @@ class Agent:
             self.modelname, self.taskname,
             model_kwargs=dict(
                 temperature=0,
+                do_sample=False,
                 max_length=2048,
                 device_map="auto",
                 offload_folder="offload",
                 torch_dtype="auto",#torch.float16
+                begin_suppress_tokens=begin_suppress_tokens,
             )
         )
         tools = langchain.agents.load_tools([], llm=llm)
